@@ -1,33 +1,101 @@
 package main
-
 import(
-	"fmt"
+	//"io"
+	"net"
+	"os"
 	"image"
 	"image/color"
 	"image/jpeg"
 	"image/draw"
-	"os"
-	"net"
-	"io/ioutil"
+	//"time"
+	//"fmt"
 )
 func main(){
-	addr,_:=net.ResolveTCPAddr("tcp","127.0.0.1:1234")
-
-	listener,_:=net.ListenTCP("tcp",addr)
-	conn,_:=listener.AcceptTCP()
-
-	data:=make([]image.Image,1024)
-	n,_:=conn.Read(data)
+	listener,_:=net.Listen("tcp",":8000")
+	defer listener.Close()
+	listener1,_:=net.Listen("tcp",":8080")
+	defer listener1.Close()
+	fo,_:=os.Create("test.jpg")
+	newFile0,_:=os.Create("ImFinale.jpg")
 	
-	var nb int =20
+	for{
 	
-	originalImage,_,_:=image.Decode(data)
+	conn,_:=listener.Accept()
+	handleConnection(conn,fo)
+	//time.Sleep(5)
+	var nb int=20
+	
+	originalFile,_:=os.Open("test.jpg")//nom de fichier à traiter
+	defer originalFile.Close()
+	
+	originalImage,_,_:=image.Decode(originalFile)
+	//découper l'image originale
+	myImages:=decoupeImage(nb,originalImage)//ici on obtient n parties
+	//commencement de traitement
+	//c:=make(chan image.Image)
+	channels:=make([] chan image.Image,nb)
+	
+	for i:=0;i<nb;i++ {
+		channels[i]=make(chan image.Image)
+		go traitementImage(myImages[i],channels[i])
+	}
+	
+	for i:=0;i<nb;i++ {
+		myImages[i]=<-channels[i]
+	}
+	
+	ImFinale:=combineIm(myImages)
+	
+	//newFile0,_:=os.Create("ImFinale.jpg")
+	defer newFile0.Close()
+	jpeg.Encode(newFile0, ImFinale, &jpeg.Options{Quality: 100})
+	
+	conn1,_:=listener1.Accept()
+	
+	//fmt.Print("1")
+	//time.Sleep(5)
+	imageSent,_:=os.Open("ImFinale.jpg")
+	sendFile(conn1,imageSent)
+	//fmt.Print("2")
+	
+	}
+	
+	
+	
 	
 
+}
+func sendFile(conn1 net.Conn,file *os.File){
+	buff:=make([]byte,65000)
+	for{
+	n,_:=file.Read(buff)
+	if n==0{
+	break
+	}
+	conn1.Write(buff[:n])
+	//fmt.Print("fini!")
+	}
+	
+	//io.Copy(conn1,file)
+	conn1.Close()
+	//fmt.Print("sendOver!")
+}
 
-
-
-
+func handleConnection(conn net.Conn,originalFile *os.File){
+	defer conn.Close()
+	//fo,_:=os.Create("test.jpg")
+	buf:=make([]byte,1024)
+	
+	for{
+	n,_:=conn.Read(buf)
+	if n==0{
+	break
+	}
+	originalFile.Write(buf[:n])
+	//fmt.Print("fini!")
+	}
+	//fmt.Print("ok!")
+	
 }
 func traitementImage(img image.Image,c chan image.Image){
 	bounds:=img.Bounds()
@@ -95,4 +163,5 @@ func combineIm(slices [] image.Image)image.Image{
 	}
 	return combIm
 }
+
 
