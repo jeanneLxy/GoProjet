@@ -1,25 +1,59 @@
 package main
 import (
-	"fmt"
+	//"io"
+	"os"
 	"net"
-	"io/ioutil"
-	"image"
-	"image/jpeg"
+	//"fmt"
 )
 func main(){
-	//definir l'@ ip et le port
-	addr,_:=net.ResolveTCPAddr("tcp","127.0.0.1:1234")
-
-	//connexion au serveur
-	conn,_:=net.DialTCP("tcp",nil,addr)
-
-	data,_:=ioutil.ReadFile("original.jpg")
-	conn.Write(data)
-	//réception de données
-	n,_:=conn.Read(data)
-	newFile1,_:=os.Create("gray.jpg")
-	defer newFile1.Close()
-	jepg.Encode(newFile1,data,&jpeg.Options{Quality:100})
-
+	conn,err:=net.Dial("tcp","localhost:8000")
+	conn1,_:=net.Dial("tcp","localhost:8080")
+	if err!=nil{
+	panic(err)
+	}
+	
+	im1,_:=os.Create("final.jpg")
+	fi,err:=os.Open("original.jpg")
+	if err!=nil{
+	panic(err)
+	}
+	buf:=make([]byte,65000)
+	//stocker le fichier dans les buffers
+	for{
+		n,_:=fi.Read(buf)
+		if n==0{
+			break
+		}
+		conn.Write(buf[:n])	
+	}
+	//fmt.Print("fini!")
+	conn.Close()
+	
+	
+	
+	//receive the image
+	//image1,_:=os.Open("READM.md")
+	
+	buff:=make([]byte,65000)
+	
+	
+	
+	
+	for{
+		n,_:=conn1.Read(buff)
+	//	if n==0{
+			//break
+	//	}
+		im1.Write(buff[:n])
+		
+		if n==0{
+			break
+		}
+	//fmt.Print("fini!")
+	}
+	
+	
+	
+		
 
 }
