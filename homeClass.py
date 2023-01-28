@@ -1,6 +1,8 @@
 import sysv_ipc
 from multiprocessing import Process
 import time
+import random
+import re
 class homeProcess(Process):
 	def __init__(self,home_id,energy):
 		super().__init__()
@@ -26,7 +28,7 @@ class homeProcess(Process):
 				hint="energy non plus"
 				message=hint.encode()
 				queue.send(message,type=2)
-			#	print(f"home {home_id} non plus ->home {i}")
+			
 	def run (self):
 		key=self.home_id
 		print(f"\nhome {self.home_id} start...")
@@ -35,10 +37,18 @@ class homeProcess(Process):
 		except sysv_ipc.ExistentialError:
 			print("connection exist ", key)
 			queue= sysv_ipc.MessageQueue(key, sysv_ipc.IPC_CREAT)
-		#time.sleep(1)
-		#queue.remove()
-		#while True:
-		if self.energy > 10:
+		
+		if energy==10:
+			i=0
+			sendall(home_id)
+			while i<4:	
+				i+=1 
+				#send to other home to indique other source home it is a home 0 
+				hint="home 0"
+				message=hint.encode()
+				queue.send(message,type=1)	
+			
+		elif self.energy > 10:
 			# check other homes if they need energy
 			for i in range(5):
 				if i!=key and i!=0:
@@ -49,24 +59,31 @@ class homeProcess(Process):
 						print(f"home {home_id} connection n'exist pas avec home {i}")
 						continue
 
-				#send type1 message to other source home to skip this queue
-					sc="source also"
-					queue.send(sc.encode(), type=1)
+					#tell other source it's also a source home
+					for j in range(4):
+						#send type1 message to other source home to skip this queue
+						sc="source also"
+						queue.send(sc.encode(), type=1)
 				
-				# Receive response from other home
-	#step 2:    find home who need energy
-	
+					# Receive response from other home
 					response,t = queue2.receive(type=1)
 					message=response.decode()
 				
+					if "home 0" in message:
+						print(f"home {home_id} said home {i} is home 0")
+						continue
+
 					if "source also" in message:
-						print(f"home {self.home_id} said home {i} is source")
+						print(f"home {home_id} said home {i} is source")
+						continue
+					elif "no need" in message:
+						print(f"home {home_id} said home{i} don't need energy anymore")
 						continue
 					else:
 						# Send energy to the needed home
-						print(f"home {self.home_id} received home {i} : {message}")
+						print(f"home {home_id} received home {i} : {message}")
 						energy_needed = int(message.split(" ")[-1])
-
+						
 						energy_extra=self.energy-10
 						if self.energy-10> energy_needed:
 							message=str(energy_needed).encode()
@@ -83,54 +100,77 @@ class homeProcess(Process):
 							print (f"home {self.home_id} remain {self.energy} units of energy")
 							print (f"home {self.home_id} don't have extra energy")
 							self.sendall(self.home_id)
-					
+			#tell other home it has no extra energy at all
+			if energy ==10:
+				sendall(home_id)	
 		else:
 			self.sendall(self.home_id)
+			print(f"home {home_id} sendall")
 			counter=0
+			nbsource=0
 			while self.energy<10 and counter<3:
-			
-	#step1:  Ask other homes for energy
+				#step 1: send in its own queue to tell "it need energy"
 				message="I need energy "+ str(10-self.energy)
 				queue.send(message.encode(),type=1)
 				print(f"home {self.home_id} message sent into its queue: energy_needed={10-self.energy}")
 				
-			#	 Receive energy from other home
-				print(f"home {self.home_id} waiting type2")
+				#Receive energy from other home
+				#print(f"home {self.home_id} waiting type2")
 				answer,t= queue.receive(type=2)
 				an=answer.decode()
-				value = an.split(" ")[0]
 				
-				while  "energy non plus" in an:
+				#count to exit while if all home has no extra energy
+				while  "energy non plus" in an and counter < 3:
 					counter+=1	
-					print(f"home {self.home_id} counter={counter}")
-					print(f"home {self.home_id} continue to wait...")
-					answer,t= queue.receive(type=2)
+					print(f"home {home_id} counter={counter}")
+					if counter<3:
+						print(f"home {home_id} continue to wait...")
+						answer,t= queue.receive(type=2)
 					an=answer.decode()
-					value = an.split(" ")[0]
-					
-				if "energy" not in value:
-					self.energy+=int(value)
-				
-				print(f"home {self.home_id} received {value} units of energy")
-				print (f"home {self.home_id} remain {self.energy} units of energy")
-				#time.sleep(1)
 
-		print(f"home {self.home_id} process end")
-	#queue.remove()
-		print(f"final {self.home_id} = {self.energy}")
+				print(f"home {home_id} receive  __{an}")
+				value = an.split(" ")[0]
+
+				if "energy" not in value:
+					nbsource+=1
+					energy+=int(value)							
+
+				print (f"home {home_id} remain {energy} units of energy")
+				
+			#send type1 message to other source home it has enough energy
+			k=1
+			while k<=4:
+				noneed="no need"
+				queue.send(noneed.encode(), type=1)
+				i+=1
 		
+	print(f"home {home_id} process end")
+	print(f"final {home_id} = {energy}")
+
 		
 if __name__=="__main__":
+	energy = [random.randint(-10, 20) for _ in range(4)]
+	for i in range(4):
+		print(f"home {i+1} init={energy[i]}")
 	for key in [1,2,3,4]:
 		try:
 			queue= sysv_ipc.MessageQueue(key, sysv_ipc.IPC_CREAT)
+			print(f"message queue {key} created!!!")
 		except sysv_ipc.ExistentialError:
 			print("connection exist ", key)
 			queue= sysv_ipc.MessageQueue(key)
-	home1_process = homeProcess(1,15)
-	home2_process = homeProcess(2,4)
-	home3_process = homeProcess(3,7)
-	home4_process = homeProcess(4,19)
+			queue.remove()
+			queue= sysv_ipc.MessageQueue(key, sysv_ipc.IPC_CREAT)
+	#clear all messages still remain in queue		
+	while queue.current_messages:
+		m, t = queue.receive()
+		dm = m.decode()
+		print(f"main process: message received: {dm}, type: {t}")
+			
+	home1_process = homeProcess(1,energy[0])
+	home2_process = homeProcess(2,energy[1])
+	home3_process = homeProcess(3,energy[2])
+	home4_process = homeProcess(4,energy[3])
 	home1_process.start()
 	home2_process.start()
 	home3_process.start()
