@@ -1,13 +1,13 @@
 import sysv_ipc
-from multiprocessing import Process
+from multiprocessing import Process,Value
 import time
 import random
-import re
+
 class homeProcess(Process):
 	def __init__(self,home_id,energy):
 		super().__init__()
 		self.home_id=home_id
-		self.energy=energy
+		self.energy=energy.value
 	def sendall(self,home_id):
 		key=self.home_id
 		try:
@@ -151,40 +151,64 @@ class homeProcess(Process):
 		
 if __name__=="__main__":
 	energy = [random.randint(-10, 20) for _ in range(4)]
+	product=10
+	consume = [random.randint(0, 20) for _ in range(4)]
+	
+	#shared memory for each home
 	for i in range(4):
 		print(f"home {i+1} init={energy[i]}")
-	for key in [1,2,3,4]:
-		try:
-			queue= sysv_ipc.MessageQueue(key, sysv_ipc.IPC_CREAT)
-			print(f"message queue {key} created!!!")
-		except sysv_ipc.ExistentialError:
-			print("connection exist ", key)
-			queue= sysv_ipc.MessageQueue(key)
-			queue.remove()
-			queue= sysv_ipc.MessageQueue(key, sysv_ipc.IPC_CREAT)
-	#clear all messages still remain in queue		
-	while queue.current_messages:
-		m, t = queue.receive()
-		dm = m.decode()
-		print(f"main process: message received: {dm}, type: {t}")
-			
-	home1_process = homeProcess(1,energy[0])
-	home2_process = homeProcess(2,energy[1])
-	home3_process = homeProcess(3,energy[2])
-	home4_process = homeProcess(4,energy[3])
-	home1_process.start()
-	home2_process.start()
-	home3_process.start()
-	home4_process.start()
-	home1_process.join()
-	home2_process.join()
-	home3_process.join()
-	home4_process.join()
-	for i in [1,2,3,4]:
-		try:
-			queue= sysv_ipc.MessageQueue(i)
-			queue.remove()
-			print(f"message queue {i} removed")
-		except sysv_ipc.ExistentialError:
-			print("connection n'exist ", i)			
+		re=product-consume[i]
+		print(f"home {i+1} rate={re}\n")
+	
+	Energy1=Value('d', energy[0])
+	Energy2=Value('d', energy[1])
+	Energy3=Value('d', energy[2])
+	Energy4=Value('d', energy[3])
+	
+	#try 10 round of process
+	for i in range(10):	
+		print(f"\n\n\n round {i}")
+		for key in [1,2,3,4]:
+			try:
+				queue= sysv_ipc.MessageQueue(key, sysv_ipc.IPC_CREAT)
+				print(f"message queue {key} created!!!")
+			except sysv_ipc.ExistentialError:
+				print("connection exist ", key)
+				queue= sysv_ipc.MessageQueue(key)
+				queue.remove()
+				queue= sysv_ipc.MessageQueue(key, sysv_ipc.IPC_CREAT)
+		#clear all messages still remain in queue		
+		while queue.current_messages:
+			m, t = queue.receive()
+			dm = m.decode()
+			print(f"main process: message received: {dm}, type: {t}")
+
+		home1_process = homeProcess(1,Energy1)
+		home2_process = homeProcess(2,Energy2)
+		home3_process = homeProcess(3,Energy3)
+		home4_process = homeProcess(4,Energy4)
+		home1_process.start()
+		home2_process.start()
+		home3_process.start()
+		home4_process.start()
+		home1_process.join()
+		home2_process.join()
+		home3_process.join()
+		home4_process.join()
 		
+		#read from weather index
+		
+		#after producing and consuming energy per month
+		Energy1.value+=product-consume[0]
+		Energy2.value+=product-consume[1]
+		Energy3.value+=product-consume[2]
+		Energy4.value+=product-consume[3]
+		
+		for i in [1,2,3,4]:
+			try:
+				queue= sysv_ipc.MessageQueue(i)
+				queue.remove()
+				print(f"message queue {i} removed")
+			except sysv_ipc.ExistentialError:
+				print("connection n'exist ", i)			
+
