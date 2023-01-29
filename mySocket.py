@@ -1,3 +1,4 @@
+#测试品质不代表最终效果
 from multiprocessing import Process
 import threading
 #import socket
