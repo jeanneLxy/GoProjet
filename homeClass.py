@@ -28,6 +28,7 @@ class homeProcess(Process):
 				hint="energy non plus"
 				message=hint.encode()
 				queue.send(message,type=2)
+		print(f"home {self.home_id} sendall")
 			
 	def run (self):
 		key=self.home_id
@@ -38,7 +39,7 @@ class homeProcess(Process):
 			print("connection exist ", key)
 			queue= sysv_ipc.MessageQueue(key, sysv_ipc.IPC_CREAT)
 		
-		if self.energy==10:
+		if self.energy==0:
 			i=0
 			self.sendall(self.home_id)
 			while i<4:	
@@ -48,7 +49,7 @@ class homeProcess(Process):
 				message=hint.encode()
 				queue.send(message,type=1)	
 			
-		elif self.energy > 10:
+		elif self.energy > 0:
 			# check other homes if they need energy
 			for i in range(5):
 				if i!=key and i!=0:
@@ -84,8 +85,8 @@ class homeProcess(Process):
 						print(f"home {self.home_id} received home {i} : {message}")
 						energy_needed = float(message.split(" ")[-1])
 						
-						energy_extra=self.energy-10
-						if self.energy-10> energy_needed:
+						energy_extra=self.energy
+						if self.energy> energy_needed:
 							message=str(energy_needed).encode()
 							queue2.send(message,type=2)
 							self.energy-=energy_needed
@@ -95,24 +96,22 @@ class homeProcess(Process):
 						else:
 							message=str(energy_extra).encode()
 							queue2.send(message,type=2)
-							self.energy=10
+							self.energy=0
 							print (f"home {self.home_id} send {energy_extra} units of energy to home {i}")
 							print (f"home {self.home_id} remain {self.energy} units of energy")
 							print (f"home {self.home_id} don't have extra energy")
-							self.sendall(self.home_id)
 			#tell other home it has no extra energy at all
-			if self.energy ==10:
+			if self.energy ==0:
 				self.sendall(self.home_id)	
 		else:
 			self.sendall(self.home_id)
-			print(f"home {self.home_id} sendall")
 			counter=0
 			nbsource=0
-			while self.energy<10 and counter<3:
+			while self.energy<0 and counter<3:
 				#step 1: send in its own queue to tell "it need energy"
-				message="I need energy "+ str(10-self.energy)
+				message="I need energy "+ str(-self.energy)
 				queue.send(message.encode(),type=1)
-				print(f"home {self.home_id} message sent into its queue: energy_needed={10-self.energy}")
+				print(f"home {self.home_id} message sent into its queue: energy_needed={-self.energy}")
 				
 				#Receive energy from other home
 				#print(f"home {self.home_id} waiting type2")
@@ -126,7 +125,7 @@ class homeProcess(Process):
 					if counter<3:
 						print(f"home {self.home_id} continue to wait...")
 						answer,t= queue.receive(type=2)
-					an=answer.decode()
+						an=answer.decode()
 
 				print(f"home {self.home_id} receive  __{an}")
 				value = an.split(" ")[0]
@@ -146,7 +145,7 @@ class homeProcess(Process):
 		
 		print(f"home {self.home_id} process end")
 		print(f"final {self.home_id} = {self.energy}")
-		print(f"home {self.home_id} energyNeedToTrade = {self.energy-10}")
+		print(f"home {self.home_id} energyNeedToTrade = {self.energy}")
 
 		
 if __name__=="__main__":
@@ -165,8 +164,9 @@ if __name__=="__main__":
 	Energy3=Value('d', energy[2])
 	Energy4=Value('d', energy[3])
 	
+	
 	#try 10 round of process
-	for i in range(10):	
+	for i in range(2):	
 		print(f"\n\n\n round {i}")
 		for key in [1,2,3,4]:
 			try:
