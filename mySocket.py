@@ -1,4 +1,3 @@
-#测试品质不代表最终效果
 from multiprocessing import Process
 import threading
 #import socket
@@ -6,16 +5,34 @@ import time
 import re
 import random
 import sysv_ipc
+import concurrent.futures
+import select
+
+class ExternalProcess(Process):
+	def run(self):
+		return
+
+class WeatherProcess(Process):
+	def __init__(self):
+		super().__init__()
+		self.shared_memory={}
+	def run(self):
+		return 
+
 
 class MarketProcess(Process):
 	def __init__(self):
 		super().__init__()
 		self.total=0
+		self.LoopTime=0
 	def calculatePrice(self):
 		return
 	
 	
 	def run (self):
+		
+		
+		
 		#def receiveHome():
 			#global totalEnergy=100
 			#total=100
@@ -29,7 +46,7 @@ class MarketProcess(Process):
 					#while True:
 					
 						#s.sendall(data)
-					time.sleep(1)
+					time.sleep(0.01)#wait the message sent
 						#data=s.recv(1024)
 						#print(threading.get_ident())
 					try:
@@ -39,9 +56,11 @@ class MarketProcess(Process):
 						return
 					
 					self.total+=totalEnergy
+					self.LoopTime+=1
 						#q.put(totalEnergy)
 						#time.sleep(1)
 					print("total in market:",self.total)
+					
 					
 					
 			
@@ -49,22 +68,41 @@ class MarketProcess(Process):
 			PORT=6666
 			import socket
 			with socket.socket(socket.AF_INET,socket.SOCK_STREAM) as server_socket:
+				server_socket.setblocking(False)
 				server_socket.bind((HOST,PORT))
 				server_socket.listen(5)
-				while True:
-					client_socket,address=server_socket.accept()
-				
-					th=threading.Thread(target=client_handler,args=(client_socket,address))
-					th1=threading.Thread(target=client_handler,args=(client_socket,address))
-					th2=threading.Thread(target=client_handler,args=(client_socket,address))
-					th3=threading.Thread(target=client_handler,args=(client_socket,address))
-					th4=threading.Thread(target=client_handler,args=(client_socket,address))
-					#th1=threading.Thread(target=receiveHome,args=())
-					th.start()
-					th1.start()
-					th2.start()
-					th3.start()
-					th4.start()	
+				with concurrent.futures.ThreadPoolExecutor(max_workers = 5) as executor:
+					while self.LoopTime<4:# 4 représente nb de "home"
+					#while True:
+						readable,writable,error=select.select([server_socket],[],[],1)
+						if server_socket in readable:
+						
+							client_socket,address=server_socket.accept()
+							executor.submit(client_handler,client_socket,address)
+						#th=threading.Thread(target=client_handler,args=(client_socket,address))
+						#th1=threading.Thread(target=client_handler,args=(client_socket,address))
+						#th2=threading.Thread(target=client_handler,args=(client_socket,address))
+						#th3=threading.Thread(target=client_handler,args=(client_socket,address))
+						#th4=threading.Thread(target=client_handler,args=(client_socket,address))
+						
+						#th1=threading.Thread(target=receiveHome,args=())
+						
+						#th.start()
+						#th1.start()
+						#th2.start()
+						#th3.start()
+						#th4.start()
+						#th.join()	
+						#th1.join()
+						#th2.join()
+						#th3.join()
+						#th4.join()
+					
+			print("startCalculatePrice")
+			if (self.total<0):
+				print("shortage of energy!!!")		
+			else:
+				print("no shortage!!!")		
 					
 					#print("receive q1: ",queue1.get())
 					#print("receive q2: ",queue2.get())
@@ -122,7 +160,7 @@ class homeProcess(Process):
 		import socket
 		with socket.socket(socket.AF_INET, socket.SOCK_STREAM) as client_socket:
 			client_socket.connect((HOST, PORT))
-			m =1
+			#m =1
 			#boucle infini et envoyer toutes les secondes
 			#while len(m)<10:
 			client_socket.sendall(str(energyTr).encode())
@@ -271,7 +309,7 @@ if __name__=="__main__":
 	market=MarketProcess()
 	
 	market.start()
-	energy = [random.randint(-10, 20) for _ in range(4)]
+	energy = [random.randint(0, 20) for _ in range(4)]
 	for i in range(4):
 		print(f"home {i+1} init={energy[i]}")
 	for key in [1,2,3,4]:
