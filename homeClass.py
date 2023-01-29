@@ -82,7 +82,7 @@ class homeProcess(Process):
 					else:
 						# Send energy to the needed home
 						print(f"home {self.home_id} received home {i} : {message}")
-						energy_needed = int(message.split(" ")[-1])
+						energy_needed = float(message.split(" ")[-1])
 						
 						energy_extra=self.energy-10
 						if self.energy-10> energy_needed:
@@ -133,7 +133,7 @@ class homeProcess(Process):
 
 				if "energy" not in value:
 					nbsource+=1
-					self.energy+=int(value)							
+					self.energy+=float(value)							
 
 				print (f"home {self.home_id} remain {self.energy} units of energy")
 				
