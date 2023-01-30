@@ -1,23 +1,46 @@
-from multiprocessing import Process
+from multiprocessing import Process, Value, Lock
 import threading
-#import socket
+#import socket # on importe dans les classes suivantes
 import time
 import re
 import random
 import sysv_ipc
 import concurrent.futures
 import select
-
-class ExternalProcess(Process):
-	def run(self):
-		return
-
+import signal
+import os
+	
+		
 class WeatherProcess(Process):
 	def __init__(self):
 		super().__init__()
-		self.shared_memory={}
+		self.shared_memory = Value("d", 0.1)
+		self.lock = Lock()
+		self.current_month=1
+
 	def run(self):
-		return 
+		while True:
+            #current_month = time.gmtime().tm_mon
+			if self.current_month in range(1, 3):
+				self.lock.acquire()
+				self.shared_memory.value = 0.1
+				self.lock.release()
+			elif self.current_month in range(4, 6):
+				self.lock.acquire()
+				self.shared_memory.value = 0.55
+				self.lock.release()
+			elif self.current_month in range(7, 9):
+				self.lock.acquire()
+				self.shared_memory.value = 0.15
+				self.lock.release()
+			elif self.current_month in range(9, 12):
+				self.lock.acquire()
+				self.shared_memory.value = 0.65
+				self.lock.release()
+			self.current_month+=1
+			if self.current_month>12:
+				self.current_month=1
+			time.sleep(1)
 
 
 class MarketProcess(Process):
@@ -25,12 +48,13 @@ class MarketProcess(Process):
 		super().__init__()
 		self.total=0
 		self.LoopTime=0
+		self.externalEvents=False
 	def calculatePrice(self):
 		return
 	
 	
 	def run (self):
-		
+			
 		
 		
 		#def receiveHome():
@@ -61,7 +85,18 @@ class MarketProcess(Process):
 						#time.sleep(1)
 					print("total in market:",self.total)
 					
-					
+			def signalHandler(sig,frame):# pour l'événement externe
+				if sig==signal.SIGUSR1:
+					os.kill(childProcess.pid,signal.SIGKILL)
+					print("signal: ",childProcess.pid)
+					print("événement exceptionnel!!!")
+					self.externalEvents=True
+			def signalChild():# pour démarrer l'événement externe
+				if _:=random.randint(0,1)==1:
+					#print("123")
+					os.kill(os.getppid(),signal.SIGUSR1)
+					print("child: ",os.getppid())
+								
 					
 			
 			HOST="localhost"
@@ -76,53 +111,25 @@ class MarketProcess(Process):
 					#while True:
 						readable,writable,error=select.select([server_socket],[],[],1)
 						if server_socket in readable:
-						
 							client_socket,address=server_socket.accept()
 							executor.submit(client_handler,client_socket,address)
-						#th=threading.Thread(target=client_handler,args=(client_socket,address))
-						#th1=threading.Thread(target=client_handler,args=(client_socket,address))
-						#th2=threading.Thread(target=client_handler,args=(client_socket,address))
-						#th3=threading.Thread(target=client_handler,args=(client_socket,address))
-						#th4=threading.Thread(target=client_handler,args=(client_socket,address))
-						
-						#th1=threading.Thread(target=receiveHome,args=())
-						
-						#th.start()
-						#th1.start()
-						#th2.start()
-						#th3.start()
-						#th4.start()
-						#th.join()	
-						#th1.join()
-						#th2.join()
-						#th3.join()
-						#th4.join()
+	
 					
 			print("startCalculatePrice")
 			if (self.total<0):
 				print("shortage of energy!!!")		
 			else:
 				print("no shortage!!!")		
+			
+			#self.externalEvents=False
+			signal.signal(signal.SIGUSR1,signalHandler)
+	
+			childProcess=Process(target=signalChild,args=())
+			childProcess.start()
+			childProcess.join()
+			
+			print("externalEvents",self.externalEvents)
 					
-					#print("receive q1: ",queue1.get())
-					#print("receive q2: ",queue2.get())
-					#total+=queue1.get()+queue2.get()
-					#print(total)
-					
-				#client_socket, address = server_socket.accept()
-				#with client_socket:
-					#print("Connected to client: ", address)
-				#	data = client_socket.recv(1024)
-				#	while len(data):
-				#		client_socket.sendall(data)
-				#		data = client_socket.recv(1024)
-					#print("Disconnecting from client: ", address)
-		
-		#th1.join()
-		#receiveHome(self)
-		#while True:
-		
-		#	receiveHome(self)
 
 class homeProcess(Process):
 	def __init__(self,home_id,energy):
@@ -160,23 +167,9 @@ class homeProcess(Process):
 		import socket
 		with socket.socket(socket.AF_INET, socket.SOCK_STREAM) as client_socket:
 			client_socket.connect((HOST, PORT))
-			#m =1
-			#boucle infini et envoyer toutes les secondes
-			#while len(m)<10:
 			client_socket.sendall(str(energyTr).encode())
 			print("energyTr",energyTr)
-			#data=client_socket.recv(1024)
-			#while True:
-			#	client_socket.sendall(str(energyTr).encode())
-			#	print("energyTr",energyTr)
-			#	#data=client_socket.recv(1024)
-			#	time.sleep(1)
-				
-			#	client_socket.sendall(str(m).encode())
-			#	data = client_socket.recv(1024)
-				#print("echo> ", data.decode())
-			#	time.sleep(1)
-			#	m+=1
+			
 	
 	def run (self):
 		key=self.home_id
@@ -335,15 +328,6 @@ if __name__=="__main__":
 
 
 
-	
-		
-	
-	#home1=HomeProcess()
-	#home2=HomeProcess()
-	
-	
-	
-
 	home1_process.start()
 	home2_process.start()
 	home3_process.start()
@@ -360,14 +344,10 @@ if __name__=="__main__":
 		except sysv_ipc.ExistentialError:
 			print("connection n'exist ", i)	
 	
-	#home1.start()
-	#home2.start()
 	
 	market.join()
 	
-	#home1.join()
 	
-	#home2.join()
 	
 	
 			
