@@ -123,7 +123,7 @@ class MarketProcess(Process):
 			with socket.socket(socket.AF_INET,socket.SOCK_STREAM) as server_socket:
 				server_socket.setblocking(False)
 				server_socket.bind((HOST,PORT))
-				server_socket.listen(5)
+				server_socket.listen(4)
 				with concurrent.futures.ThreadPoolExecutor(max_workers = 4) as executor:
 					
 					
