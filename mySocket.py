@@ -95,7 +95,7 @@ class MarketProcess(Process):
 						return
 					
 					totalEnergy=float(data.decode())
-					self.total+=totalEnergy
+					self.total+=float(data.decode())
 					#self.LoopTime+=1
 					#print(self.LoopTime)
 						#q.put(totalEnergy)
