@@ -1,6 +1,6 @@
 def signalHandler:
-    if signalReçu==SIGUSR1:
-        change several factor in market!
+    if signalReceived==SIGUSR1:
+        change several factors in market!
 def signalChild:
     50% probability
         send SIGUSR1 to market! 
